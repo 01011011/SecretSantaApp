@@ -21,6 +21,7 @@ namespace SecretSantaApp.Controllers
         [AllowAnonymous, HttpGet]
         public HttpResponseMessage Get()
         {
+            //this is a comment
             var groups = _groupService.GetAllGroups().ToList();
             return Request.CreateResponse(HttpStatusCode.OK, groups);
         }
