@@ -1,0 +1,24 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: SecretSanta
+  labels:
+    app: SecretSanta
+    kubernetes.azure.com/generator: devhub
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: SecretSanta
+  template:
+    metadata:
+      labels:
+        app: SecretSanta
+    spec:
+      containers:
+        - name: SecretSanta
+          image: containernik.azurecr.io/secretsanta:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 80
