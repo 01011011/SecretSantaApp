@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/dotnet/sdk:7.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:4.8 AS build
 WORKDIR /app
     
 # Copy csproj and restore as distinct layers
@@ -12,7 +12,7 @@ WORKDIR /app/SecretSantaApp
 RUN dotnet publish --configuration Release --output /app/publish
 
 # Final stage/image
-FROM mcr.microsoft.com/dotnet/aspnet:7.0 AS runtime
+FROM mcr.microsoft.com/dotnet/aspnet:4.8 AS runtime
 WORKDIR /app
 COPY --from=build /app/publish .
 ENTRYPOINT ["dotnet", "SecretSantaApp.dll"]
