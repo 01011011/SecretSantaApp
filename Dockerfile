@@ -1,21 +1,18 @@
-FROM mcr.microsoft.com/dotnet/sdk:7.0 AS builder
+FROM mcr.microsoft.com/dotnet/sdk:7.0 AS build
 WORKDIR /app
 
-# caches restore result by copying csproj file separately
-COPY SecretSantaApp/*.csproj .
+# Copy csproj and restore as distinct layers
+COPY *.sln .
+COPY SecretSantaApp/*.csproj ./SecretSantaApp/
 RUN dotnet restore
 
+# Copy everything else and build
 COPY . .
-RUN dotnet publish --output /app/ --configuration Release --no-restore
-RUN sed -n 's:.*<AssemblyName>\(.*\)</AssemblyName>.*:\1:p' *.csproj > __assemblyname
-RUN if [ ! -s __assemblyname ]; then filename=$(ls *.csproj); echo ${filename%.*} > __assemblyname; fi
+WORKDIR /app/SecretSantaApp
+RUN dotnet publish --configuration Release --output /app/publish
 
-# Stage 2
-FROM mcr.microsoft.com/dotnet/aspnet:7.0
+# Final stage/image
+FROM mcr.microsoft.com/dotnet/aspnet:7.0 AS runtime
 WORKDIR /app
-COPY --from=builder /app .
-
-ENV PORT 80
-EXPOSE 80
-
-ENTRYPOINT dotnet $(cat /app/__assemblyname).dll --urls "http://*:80"
+COPY --from=build /app/publish .
+ENTRYPOINT ["dotnet", "SecretSantaApp.dll"]
