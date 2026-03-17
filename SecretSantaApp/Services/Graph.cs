@@ -1,7 +1,3 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using Microsoft.Ajax.Utilities;
 using SecretSantaApp.Infrastructure.Helpers;
 using SecretSantaApp.Models;
 
@@ -9,10 +5,11 @@ namespace SecretSantaApp.Services
 {
     public class Graph
     {
-        private Dictionary<string,string> matches = new Dictionary<string, string>();
         public List<string> Vertices { get; set; }
         public Dictionary<string, List<string>> AdjacencyList { get; } = new Dictionary<string, List<string>>();
+
         public Graph() { }
+
         public Graph(List<string> users, IEnumerable<Tuple<string, string>> edges)
         {
             Vertices = users;
@@ -41,24 +38,23 @@ namespace SecretSantaApp.Services
             }
         }
 
-        bool Check(List<string> possibleEdges, string gifter,
-            Dictionary<string, bool> visited, Dictionary<string, bool> receivers)
+        // Augmenting-path DFS for maximum bipartite matching.
+        // matchReceiver maps receiver → gifter currently assigned to them.
+        private bool TryAugment(string gifter, Dictionary<string, string> matchReceiver, HashSet<string> visited)
         {
-            for (int v = 0; v < receivers.Count; v++)
+            foreach (var receiver in AdjacencyList[gifter])
             {
-                var receiver = receivers.Keys.ElementAt(v);
-                if (possibleEdges.Contains(receiver)
-                    && !visited.ContainsKey(receiver))
-                {
-                    visited.Add(receiver, true);
+                if (visited.Contains(receiver))
+                    continue;
 
-                    if (receivers.Values.ElementAt(v) || Check(possibleEdges, gifter,
-                            visited, receivers))
-                    {
-                        matches.Add(gifter,receiver);
-                        receivers.Remove(receiver);
-                        return true;
-                    }
+                visited.Add(receiver);
+
+                // If receiver is unmatched, or we can reassign its current gifter elsewhere
+                if (!matchReceiver.ContainsKey(receiver) ||
+                    TryAugment(matchReceiver[receiver], matchReceiver, visited))
+                {
+                    matchReceiver[receiver] = gifter;
+                    return true;
                 }
             }
             return false;
@@ -66,36 +62,36 @@ namespace SecretSantaApp.Services
 
         public Dictionary<string, string> GetMatchedData()
         {
-            var randomReceivers = new List<string>();
-            Vertices.CopyItemsTo(randomReceivers);
-            randomReceivers.Randomize();
-
-            var receivers = new Dictionary<string, bool>();
-            foreach (var vertex in randomReceivers)
+            // Randomize each adjacency list for variety in results
+            foreach (var vertex in Vertices)
             {
-                receivers.Add(vertex, true);
+                AdjacencyList[vertex].Randomize();
             }
 
-            var users = Vertices.Select(x => new {Name = x,
-                 AdjacencyList[x].Count})
-                .OrderBy(a => a.Count)
-                .Select(b => b.Name);
+            // matchReceiver: receiver → gifter
+            var matchReceiver = new Dictionary<string, string>();
 
-            // Count of matchings
-            int result = 0;
-            foreach (var gifter in users)
+            // Process most-constrained gifters first
+            var orderedGifters = Vertices
+                .OrderBy(x => AdjacencyList[x].Count)
+                .ToList();
+
+            foreach (var gifter in orderedGifters)
             {
-                var visited = new Dictionary<string, bool>();
-
-                //Find if user can be matched
-                if (Check(AdjacencyList[gifter], gifter, visited, receivers))
-                {
-                    result++;
-                }
-                    
+                var visited = new HashSet<string>();
+                TryAugment(gifter, matchReceiver, visited);
             }
 
-            return result == Vertices.Count ? matches : new Dictionary<string, string>();
+            if (matchReceiver.Count != Vertices.Count)
+                return new Dictionary<string, string>();
+
+            // Invert to gifter → receiver
+            var result = new Dictionary<string, string>();
+            foreach (var kvp in matchReceiver)
+            {
+                result[kvp.Value] = kvp.Key;
+            }
+            return result;
         }
     }
 }

@@ -1,136 +1,105 @@
-﻿using SecretSantaApp.Models;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Web;
+using SecretSantaApp.Models;
 
 namespace SecretSantaApp.Services
 {
     public class UserRepository : IUserRepository
     {
-        private const string CacheKey = "UserStore";
+        private readonly List<User> _users = new List<User>();
+        private readonly IGroupRepository _groupRepository;
+        private readonly object _lock = new object();
 
-        public UserRepository()
+        public UserRepository(IGroupRepository groupRepository)
         {
-            var currentContext = HttpContext.Current;
-
-            if (currentContext == null) return;
-
-            if (currentContext.Cache[CacheKey] == null)
-            {
-                currentContext.Cache[CacheKey] = new User[0];
-            }
+            _groupRepository = groupRepository;
         }
 
         public IEnumerable<User> GetAllUsers()
         {
-            var currentContext = HttpContext.Current;
-            return (User[]) currentContext?.Cache[CacheKey];
+            lock (_lock)
+            {
+                return _users.ToList();
+            }
         }
 
         public bool SaveUser(User user)
         {
-            var currentContext = HttpContext.Current;
-            if (currentContext == null) return false;
-
-            try
+            lock (_lock)
             {
-                var users = ((User[])currentContext.Cache[CacheKey]).ToList();
-
-                if (UserExistsByName(users, user.Name)) return false;
-
-                users.Add(user);
-                currentContext.Cache[CacheKey] = users.ToArray();
-                return true;
-
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine(ex.ToString());
-                return false;
+                try
+                {
+                    if (UserExistsByName(_users, user.Name)) return false;
+                    _users.Add(user);
+                    return true;
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine(ex.ToString());
+                    return false;
+                }
             }
         }
 
         public bool DeleteUser(int id)
         {
-            var currentContext = HttpContext.Current;
-
-            if (currentContext == null) return false;
-
-            try
+            lock (_lock)
             {
-                var users = ((User[])currentContext.Cache[CacheKey]).ToList();
-
-                if (!UserExistsByGuid(users, id)) return false;
-                var userToDelete = GetUserByGuid(id);
-                //remove user from userlist
-                var result = users.Remove(userToDelete);
-
-                currentContext.Cache[CacheKey] = users.ToArray();
-                return result;
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine(ex.ToString());
-                return false;
+                try
+                {
+                    var userToDelete = _users.FirstOrDefault(x => x.Id == id);
+                    if (userToDelete == null) return false;
+                    return _users.Remove(userToDelete);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine(ex.ToString());
+                    return false;
+                }
             }
         }
 
         public bool UpdateUser(int id, string name)
         {
-            var currentContext = HttpContext.Current;
-
-            if (currentContext == null) return false;
-
-            try
+            lock (_lock)
             {
-                var users = ((User[])currentContext.Cache[CacheKey]).ToList();
-
-                if (!UserExistsByGuid(users, id)) return false;
-
-                //if we got here there is user, no need to check for null ref
-                var user = users.First(x => x.Id == id);
-                user.Name = name;
-
-                currentContext.Cache[CacheKey] = users.ToArray();
-                return true;
-
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine(ex.ToString());
-                return false;
+                try
+                {
+                    var user = _users.FirstOrDefault(x => x.Id == id);
+                    if (user == null) return false;
+                    user.Name = name;
+                    return true;
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine(ex.ToString());
+                    return false;
+                }
             }
         }
 
         public User GetUserByGuid(int id)
         {
-            var currentContext = HttpContext.Current;
-
-            var users = ((User[]) currentContext?.Cache[CacheKey])?.ToList();
-
-            if (users != null && users.Any())
+            lock (_lock)
             {
-                return users.FirstOrDefault(x => x.Id == id);
+                return _users.FirstOrDefault(x => x.Id == id);
             }
-
-            return null;
         }
 
         public Dictionary<string, string> RunMatchingAlgorithm()
         {
-            //lets do the fun work :)
-            var currentContext = HttpContext.Current;
+            List<User> users;
+            List<Group> groups;
 
-            var users = ((User[])currentContext?.Cache[CacheKey])?.ToList();
-            var groups = ((Group[])currentContext?.Cache["GroupStore"])?.ToList();
+            lock (_lock)
+            {
+                users = _users.ToList();
+            }
 
-            //we should have everything by now, just doing another check.
+            groups = _groupRepository.GetAllGroups()?.ToList();
+
             if (users == null || groups == null) return null;
 
-            //set all possible undirected edges between verticles (users)
             var edges = new List<Tuple<string, string>>();
-            foreach(var user in users)
+            foreach (var user in users)
             {
                 var group = groups.FirstOrDefault(x => x.Users.Any(m => m.Id == user.Id));
 
@@ -165,11 +134,5 @@ namespace SecretSantaApp.Services
         {
             return users.Any(x => x.Name.ToLowerInvariant() == name.ToLowerInvariant());
         }
-
-        private bool UserExistsByGuid(IEnumerable<User> users, int id)
-        {
-            return users.Any(x => x.Id == id);
-        }
     }
 }
-

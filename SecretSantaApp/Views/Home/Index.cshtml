@@ -1,4 +1,4 @@
-﻿<t>
+<div>
     <h3>Create your Secret Santa now - Start by adding people</h3>
 
     <!-- Making a template for easier binding -->
@@ -48,7 +48,7 @@
                         <button class="btn btn-primary" data-bind="click: newGroup, enable: enableGroupAdd">Create Group</button>
                         <div id="group-name-submit" style="display: none;">
                             <span>Enter Group Name: </span>
-                            <input class="input-group-sm" id="group-name" data-bind="value: groupName, valueUpdate: " afterkeydown" />
+                            <input class="input-group-sm" id="group-name" data-bind='value: groupName, valueUpdate: "afterkeydown"' />
                             <button class="btn btn-primary" data-bind="click: saveGroup">Save</button>
                         </div>
                     </div>

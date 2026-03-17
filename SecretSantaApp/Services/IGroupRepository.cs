@@ -1,5 +1,4 @@
-﻿using SecretSantaApp.Models;
-using System.Collections.Generic;
+using SecretSantaApp.Models;
 
 namespace SecretSantaApp.Services
 {

@@ -1,15 +1,12 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Net;
-using System.Net.Http;
-using System.Web.Http;
+using Microsoft.AspNetCore.Mvc;
 using SecretSantaApp.Models;
 using SecretSantaApp.Services;
 
 namespace SecretSantaApp.Controllers
 {
-    public class GroupsController : ApiController
+    [ApiController]
+    [Route("api/[controller]")]
+    public class GroupsController : ControllerBase
     {
         private readonly IGroupRepository _groupService;
 
@@ -18,52 +15,47 @@ namespace SecretSantaApp.Controllers
             _groupService = groupService;
         }
 
-        [AllowAnonymous, HttpGet]
-        public HttpResponseMessage Get()
+        [HttpGet]
+        public IActionResult Get()
         {
-            //this is a comment
             var groups = _groupService.GetAllGroups().ToList();
-            return Request.CreateResponse(HttpStatusCode.OK, groups);
+            return Ok(groups);
         }
 
-        [AllowAnonymous, HttpGet]
-        public HttpResponseMessage Get(int id)
+        [HttpGet("{id}")]
+        public IActionResult Get(int id)
         {
             var group = _groupService.GetGroupById(id);
-
             return group == null
-                ? Request.CreateErrorResponse(HttpStatusCode.NotFound, "There is no group by this guid!")
-                : Request.CreateResponse(HttpStatusCode.OK, group);
+                ? NotFound("There is no group by this guid!")
+                : Ok(group);
         }
 
-        [AllowAnonymous, HttpPost]
-        public HttpResponseMessage Post([FromBody]Group group)
+        [HttpPost]
+        public IActionResult Post([FromBody] Group group)
         {
             var result = _groupService.SaveGroup(group);
-
             return result
-                ? Request.CreateResponse(HttpStatusCode.Created, "Group created Sucessfully")
-                : Request.CreateErrorResponse(HttpStatusCode.Conflict, "Group with the same name already exists!");
+                ? StatusCode(201, "Group created Successfully")
+                : Conflict("Group with the same name already exists!");
         }
 
-        [AllowAnonymous, HttpPut]
-        public HttpResponseMessage Put(int id, [FromBody]List<User> users)
+        [HttpPut]
+        public IActionResult Put(int id, [FromBody] List<User> users)
         {
             var result = _groupService.UpdateGroup(id, users);
-
             return result
-                ? Request.CreateResponse(HttpStatusCode.OK, "Group updated Sucessfully")
-                : Request.CreateErrorResponse(HttpStatusCode.NotFound, "Could not find any group to update!");
+                ? Ok("Group updated Successfully")
+                : NotFound("Could not find any group to update!");
         }
 
-        [AllowAnonymous, HttpDelete]
-        public HttpResponseMessage Delete(int id, [FromBody]User user)
+        [HttpDelete]
+        public IActionResult Delete(int id, [FromBody] User user)
         {
             var result = _groupService.RemoveUserFromGroup(id, user);
-
             return result
-                ? Request.CreateResponse(HttpStatusCode.OK, "Group deleted Sucessfully")
-                : Request.CreateErrorResponse(HttpStatusCode.NotFound, "Could not find any group to delete!");
+                ? Ok("Group deleted Successfully")
+                : NotFound("Could not find any group to delete!");
         }
     }
 }

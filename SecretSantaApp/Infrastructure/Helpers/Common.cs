@@ -1,5 +1,3 @@
-﻿using System;
-using System.Collections.Generic;
 using SecretSantaApp.Models;
 
 namespace SecretSantaApp.Infrastructure.Helpers
@@ -20,11 +18,9 @@ namespace SecretSantaApp.Infrastructure.Helpers
     public static class RandomizationExtensions
     {
         private static readonly Random Random = new Random();
-        // Randomize an array.
+
         public static void Randomize<T>(this T[] items)
         {
-            // For each spot in the array, pick
-            // a random item to swap into that spot.
             for (int i = 0; i < items.Length - 1; i++)
             {
                 int j = Random.Next(i, items.Length);
@@ -34,16 +30,10 @@ namespace SecretSantaApp.Infrastructure.Helpers
             }
         }
 
-        // Randomize a list.
         public static void Randomize<T>(this List<T> items)
         {
-            // Convert into an array.
             T[] array = items.ToArray();
-
-            // Randomize.
             array.Randomize();
-
-            // Copy the items back into the list.
             items.Clear();
             items.AddRange(array);
         }
