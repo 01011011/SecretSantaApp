@@ -1,112 +1,112 @@
-<div>
+<div x-data="secretSanta">
     <h3>Create your Secret Santa now - Start by adding people</h3>
 
-    <!-- Making a template for easier binding -->
-<script type="text/html" id="users-template">
-    <tr class="d-table-row">
-        <td>
-            <!-- ko if: showCheckbox -->
-            <input type="checkbox" data-bind="value: Id,
-                       checked: checked, visible: $parent.checkVisible, click: $parent.userChecked" />
-            <!-- /ko -->
-            <!-- ko ifnot: showCheckbox -->
-            <i class="fas fa-check"></i> 
-            <!-- /ko -->
-        </td>
-        <td><span data-bind="text: Name"></span></td>
-        <td><button class="btn btn-danger" data-bind="click: $parent.delete">Delete</button></td>
-    </tr>
-</script>
-
-    <script type="text/html" id="group-users-template">
-        <tr class="d-table-row">
-            <td><input name="group-id" type="hidden" data-bind="value: $parent.Id" /></td>
-            <td><input id="userId" type="hidden" data-bind="value: Id" /></td>
-            <td><span data-bind="text: Name"></span></td>
-            <td><button class="btn btn-danger" data-bind="click: $root.removeFromGroup">Remove</button></td>
-        </tr>
-    </script>
-
-    <script type="text/html" id="match-template">
-        <tr class="d-table-row">
-            <td><span data-bind="text: Sender"></span></td>
-            <td>  ->  </td>
-            <td><span data-bind="text: Receiver"></span></td>
-        </tr>
-    </script>
-
-   
-    <form>
+    <form x-on:submit.prevent>
         <table class="table">
             <tr class="row">
                 <td style="width: 33.33%">
-                    <input class="input-add" placeholder="Add Name (Must be unique)" data-bind='value: userToAdd, valueUpdate: "afterkeydown"' />
-                    <button class="btn btn-primary" data-bind="click: addUser, enable: userToAdd().length > 0">Add</button>
+                    <input class="input-add" placeholder="Add Name (Must be unique)"
+                           x-model="userToAdd" x-on:keydown.enter="addUser()" />
+                    <button class="btn btn-primary" x-on:click="addUser()" x-bind:disabled="!userToAdd.length">Add</button>
                 </td>
                 <td style="width: 33.33%">
-                    <div data-bind="visible: enableGroupAdd">
-                        <button class="btn btn-primary" data-bind="click: newGroup, enable: enableGroupAdd">Create Group</button>
-                        <div id="group-name-submit" style="display: none;">
+                    <div x-show="enableGroupAdd">
+                        <button class="btn btn-primary" x-on:click="showGroupNameInput = true">Create Group</button>
+                        <div x-show="showGroupNameInput">
                             <span>Enter Group Name: </span>
-                            <input class="input-group-sm" id="group-name" data-bind='value: groupName, valueUpdate: "afterkeydown"' />
-                            <button class="btn btn-primary" data-bind="click: saveGroup">Save</button>
+                            <input class="form-control form-control-sm d-inline-block w-auto" x-model="groupName"
+                                   x-on:keydown.enter="saveGroup()" />
+                            <button class="btn btn-primary" x-on:click="saveGroup()">Save</button>
                         </div>
                     </div>
-                    <div data-bind="visible: showBoth">
-                        <p>
-                            -  OR  -
-                        </p>
+                    <div x-show="showBoth">
+                        <p>- OR -</p>
                     </div>
-                    <div data-bind="visible: canAddToGroup">
-
+                    <div x-show="canAddToGroup">
                         Add to an existing Group:
-                        <select class="form-control" data-bind="options: groups,
-                       optionsText: 'Name',
-                       value: selectedGroup,
-                       optionsCaption: 'Choose...'"></select><br />
-                        <button class="btn btn-primary" data-bind="click: updateGroup">Update</button>
+                        <select class="form-select" x-model="selectedGroupId">
+                            <option value="">Choose...</option>
+                            <template x-for="g in groups" x-bind:key="g.Id">
+                                <option x-bind:value="g.Id" x-text="g.Name"></option>
+                            </template>
+                        </select><br />
+                        <button class="btn btn-primary" x-on:click="updateGroup()">Update</button>
                     </div>
                 </td>
                 <td style="width: 33.33%">
-                    <button class="btn btn-primary" data-bind="click: runAlghoritm">Match</button>
+                    <button class="btn btn-primary" x-on:click="runMatch()">Match</button>
                 </td>
             </tr>
             <tr class="row">
-                <td style="width: 33%"  data-bind="visible: usersVisible">
+                <td style="width: 33%" x-show="usersVisible">
                     <h3>Users</h3>
-                    <table class="table table">
-                        <thead class="thead-dark">
-                        <tr>
-                            <th>Select</th>
-                            <th>Name</th>
-                            <th>Delete</th>
-                        </tr>
-                        </thead>
-                        <tbody data-bind="template: { name: 'users-template', foreach: users}"></tbody>
-                    </table>
-                </td>
-                <td style="width: 33.33%" data-bind="visible: groupsVisible">
-                    <h3>Groups</h3>
-                    <table class="table table" data-bind="foreach: groups">
-                        <thead class="thead-dark">
+                    <table class="table">
+                        <thead class="table-dark">
                             <tr>
-                                <th colspan="4" data-bind="text: Name"></th>
+                                <th>Select</th>
+                                <th>Name</th>
+                                <th>Delete</th>
                             </tr>
                         </thead>
-                        <tbody data-bind="template: { name: 'group-users-template', foreach: Users}"></tbody>
+                        <tbody>
+                            <template x-for="user in users" x-bind:key="user.Id">
+                                <tr>
+                                    <td>
+                                        <template x-if="!isUserInGroup(user.Id)">
+                                            <input type="checkbox" x-show="checkVisible"
+                                                   x-bind:checked="isUserSelected(user.Id)"
+                                                   x-on:click="toggleUserSelection(user)" />
+                                        </template>
+                                        <template x-if="isUserInGroup(user.Id)">
+                                            <i class="fas fa-check"></i>
+                                        </template>
+                                    </td>
+                                    <td x-text="user.Name"></td>
+                                    <td><button class="btn btn-danger" x-on:click="deleteUser(user)">Delete</button></td>
+                                </tr>
+                            </template>
+                        </tbody>
                     </table>
                 </td>
-                <td style="width: 33.33%" data-bind="visible: showMatching">
+                <td style="width: 33.33%" x-show="groupsVisible">
+                    <h3>Groups</h3>
+                    <template x-for="group in groups" x-bind:key="group.Id">
+                        <table class="table">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th colspan="2" x-text="group.Name"></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <template x-for="u in group.Users" x-bind:key="u.Id">
+                                    <tr>
+                                        <td x-text="u.Name"></td>
+                                        <td><button class="btn btn-danger" x-on:click="removeFromGroup(group.Id, u)">Remove</button></td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </template>
+                </td>
+                <td style="width: 33.33%" x-show="showMatching">
                     <h3>Matches</h3>
-                    <table class="table table">
-                        <thead class="thead-dark">
+                    <table class="table">
+                        <thead class="table-dark">
                             <tr>
                                 <th>Sender</th>
-                                <th>-></th>
+                                <th>&rarr;</th>
                                 <th>Receiver</th>
                             </tr>
                         </thead>
-                        <tbody data-bind="template: { name: 'match-template', foreach: matches}"></tbody>
+                        <tbody>
+                            <template x-for="m in matches" x-bind:key="m.Sender">
+                                <tr>
+                                    <td x-text="m.Sender"></td>
+                                    <td>&rarr;</td>
+                                    <td x-text="m.Receiver"></td>
+                                </tr>
+                            </template>
+                        </tbody>
                     </table>
                 </td>
             </tr>

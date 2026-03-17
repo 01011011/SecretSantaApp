@@ -18,9 +18,9 @@ The matching algorithm ensures:
 
 | Layer | Technology |
 |-------|-----------|
-| **Runtime** | .NET 8 / ASP.NET Core |
+| **Runtime** | .NET 9 / ASP.NET Core |
 | **Backend** | ASP.NET Core MVC + Web API |
-| **Frontend** | Knockout.js, jQuery, Bootstrap 4 |
+| **Frontend** | Alpine.js 3, Bootstrap 5, Fetch API |
 | **Data Storage** | In-memory (singleton repositories) |
 | **DI** | Built-in ASP.NET Core dependency injection |
 | **Algorithm** | Augmenting-path bipartite matching (guarantees optimal result) |
@@ -29,7 +29,7 @@ The matching algorithm ensures:
 
 ### Prerequisites
 
-- [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) or later
+- [.NET 9 SDK](https://dotnet.microsoft.com/download/dotnet/9.0) or later
 
 ### Run Locally
 
@@ -96,8 +96,7 @@ SecretSantaApp/
 │   └── Shared/_Layout.cshtml   # Layout template
 ├── wwwroot/
 │   ├── css/site.css            # Custom styles
-│   ├── js/secretsanta.js       # Knockout.js view models
-│   └── lib/bootstrap.min.css   # Bootstrap CSS
+│   └── js/secretsanta.js       # Alpine.js app component
 └── Dockerfile                  # Multi-stage Docker build
 ```
 

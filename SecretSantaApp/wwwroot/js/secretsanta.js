@@ -1,364 +1,177 @@
-﻿$(function () {
+document.addEventListener('alpine:init', () => {
+    Alpine.data('secretSanta', () => ({
+        users: [],
+        groups: [],
+        matches: [],
+        selectedUsers: [],
+        userToAdd: '',
+        groupName: '',
+        showGroupNameInput: false,
+        selectedGroupId: '',
 
-    var UserModel = function (data) {
+        baseUriUsers: 'api/Users',
+        baseUriGroups: 'api/Groups',
 
-        data = data || {};
-        var self = this;
+        get usersVisible() { return this.users.length > 0; },
+        get groupsVisible() { return this.groups.length > 0; },
+        get checkVisible() { return this.users.length > 1; },
+        get enableGroupAdd() { return this.selectedUsers.length > 1; },
+        get canAddToGroup() { return this.selectedUsers.length > 0 && this.groupsVisible; },
+        get showBoth() { return this.canAddToGroup && this.enableGroupAdd; },
+        get showMatching() { return this.matches.length > 0; },
 
-        this.Id = ko.observable(data.Id);
-        this.Name = ko.observable(data.Name);
-        this.inGroup = ko.observable(false);
-        this.checked = ko.observable(false);
-        this.Match = ko.observable(data.Match);
-        this.showCheckbox = ko.observable(true);
-    };
+        async init() {
+            await this.getUserData();
+            await this.getGroupData();
+        },
 
-    var GroupModel = function (data) {
+        isUserInGroup(userId) {
+            return this.groups.some(g => g.Users.some(u => u.Id === userId));
+        },
 
-        data = data || {};
-        this.Id = ko.observable(data.Id);
-        this.Name = ko.observable(data.Name);
-        this.Users = ko.observableArray(data.Users);
-    };
+        isUserSelected(userId) {
+            return this.selectedUsers.some(u => u.Id === userId);
+        },
 
-    var MatchViewModel = function(data) {
-        var self = this;
-        self.Sender = ko.observable(data.Sender);
-        self.Receiver = ko.observable(data.Receiver);
-    };
-
-    var SecretSantaViewModel = function (users) {
-        
-        var self = this;
-        this.baseUriUsers = "api/Users";
-        this.baseUriGroups = "api/Groups";
-
-        this.users = ko.observableArray([]);
-        this.selectedUsers = ko.observableArray([]);
-        this.groups = ko.observableArray([]);
-        this.userToAdd = ko.observable("");
-        this.groupName = ko.observable("");
-        this.usersInGroups = ko.observableArray([]);
- 
-        this.matches = ko.observableArray([]);
-        this.showMatching = ko.pureComputed(function() {
-            return self.matches().length > 0;
-        });
-
-        this.flatten = function (a) {
-            return Array.isArray(a) ? [].concat.apply([], a.map(self.flatten)) : a;
-        };
-
-        this.usersIdsInGroups = ko.pureComputed(function () {
-            var idArray = self.flatten(self.usersInGroups());
-            var result = idArray.map(a => a.Id);
-            return result;
-        });
-
-        this.checkVisible = ko.pureComputed(function () {
-            return self.users().length > 1;
-        });
-
-        this.enableGroupAdd = ko.pureComputed(function() {
-            return self.selectedUsers().length > 1;
-        });
-
-        this.usersVisible = ko.pureComputed(function() {
-            return self.users().length > 0;
-        });
-
-        this.groupsVisible = ko.pureComputed(function () {
-            return self.groups().length > 0;
-        });
-
-        this.canAddToGroup = ko.pureComputed(function() {
-            return self.selectedUsers().length > 0 && self.groupsVisible();
-        });
-
-        this.showBoth = ko.pureComputed(function() {
-            return self.canAddToGroup() && self.enableGroupAdd();
-        });
-
-        this.selectedGroup = ko.observable();
-
-        this.updateGroup = function() {
-            self.updateExistingGroup(this.selectedGroup().Id(), this.selectedUsers());
-        };
-
-        this.mapUserData = function (data) {
-
-            self.users(ko.utils.arrayMap(data, function (d) {
-
-                var model = new UserModel(d);
-
-                var match = ko.utils.arrayFirst(self.selectedUsers(), function (i) {
-                    return d.Id === i.Id();
-                });
-
-                if (match) {
-                    model.checked = true;
-                }
-
-                var showCheck = ko.utils.arrayFirst(self.usersIdsInGroups(), function (i) {
-                    return d.Id === i;
-                });
-
-                if (showCheck) {
-                    model.inGroup = true;
-                    model.showCheckbox = false;
-                }
-
-                return model;
-            }));
-        };
-
-        this.mapGroupData = function (data) {
-            self.groups(ko.utils.arrayMap(data, function (d) {
-                self.usersInGroups.push(d.Users);
-                return new GroupModel(d);
-            }));
-        };
-
-        this.getUserData = function() {
-            $.ajax({
-                url: self.baseUriUsers,
-                type: 'GET',
-                accepts: "application/json",
-                contentType: "application/json"
-            }).done(function (result) {
-                self.users.removeAll();
-                if (result === undefined || result === null) {
-                    return;
-                } else {
-                    if (result.length > 0) {
-                        self.mapUserData(result);
-                    }
-                }
-            }).fail(function (xhr, error, status) {
-                alert("Status Code: " + status +"\nMessage: " + xhr.responseText);
-            });
-        };
-
-        this.addUser = function() {
-
-            if (self.userToAdd() !== "") {
-
-                $.ajax({
-                    url: self.baseUriUsers,
-                    type: 'POST',
-                    accepts: "application/json",
-                    data: JSON.stringify(self.userToAdd()),
-                    contentType: "application/json"
-                }).done(function(result) {
-                    self.getUserData();
-                    self.userToAdd("");
-                }).fail(function(xhr, error, status) {
-                    if (status === "Conflict") {
-                        alert(xhr.responseJSON.Message);
-                    } else {
-                        alert("Status Code: " + status + "\nMessage: " + xhr.responseText);
-                    }
-                });
-            }
-        };
-
-        this.delete = function (user) {
-
-            self.removeIfSelected(user);
-
-            $.ajax({
-                url: self.baseUriUsers + "/?id=" + user.Id(),
-                type: 'DELETE'
-            }).done(function(result) {
-                self.getUserData();
-            }).fail(function(xhr, error, status) {
-                if (status === "NotFound") {
-                    alert(xhr.responseJSON.Message);
-                } else {
-                    alert("Status Code: " + status + "\nMessage: " + xhr.responseText);
-                }
-            });
-        };
-
-        this.removeIfSelected = function (user) {
-            
-            var match = ko.utils.arrayFirst(self.selectedUsers(), function (i) {
-                return user.Id() === i.Id();
-            });
-
-            if (match) {
-                self.selectedUsers.remove(match);
-            }
-        };
-
-        this.removeAllSelectedUsers = function () {
-            self.selectedUsers.removeAll();
-        };
-
-        this.userChecked = function (user, element) {
-            var $checkBox = $(element.target);
-            var isChecked = $checkBox.is(":checked");
-
-            //If it is checked and not in the array, add it
-            if (isChecked && self.selectedUsers().indexOf(user) < 0) {
-                self.selectedUsers.push(user);
-            }
-            //If it is in the array and not checked remove it                
-            else if (!isChecked && self.selectedUsers().indexOf(user) >= 0) {
-                self.selectedUsers.remove(user);
-            }
-            //Need to return to to allow the Checkbox to process checked/unchecked
-            return true;
-        };
-        
-        this.newGroup = function () {
-            $("#group-name-submit").show();
-        };
-
-        this.canRemoveUserFromGroup = function(id) {
-            //implement
-            var flatGroup = self.flatten(self.groups());
-            var retItem = ko.toJS(flatGroup).filter(function (item) {
-                return item.Id === parseInt(id);
-            });
-            var numberOfUsers = retItem[0].Users.length;
-            
-            return numberOfUsers > 2;
-        };
-
-        this.deleteGroup = function(id, user) {
-            $.ajax({
-                url: self.baseUriGroups + "/?id=" + id,
-                type: 'DELETE',
-                traditional: true,
-                data: JSON.stringify(user),
-                contentType: "application/json"
-            }).done(function (result) {
-                self.getGroupData();
-                self.getUserData();
-            }).fail(function (xhr, error, status) {
-                if (status === "NotFound") {
-                    alert(xhr.responseJSON.Message);
-                } else {
-                    alert("Status Code: " + status + "\nMessage: " + xhr.responseText);
-                }
-            });
-        };
-
-        this.removeFromGroup = function (user, event) {
-
-            var groupId = $(event.target).closest("tr").find("input[name='group-id']").val();
-
-            if (!self.canRemoveUserFromGroup(groupId)) {
-                var deleteWholeGroup = confirm("Each group has to have at least 2 people.  Deleting " +
-                    "this item will delete the whole group.  Are you sure you want to continue?");
-
-                if (deleteWholeGroup) {
-                    self.deleteGroup(groupId, user);
-                }
+        toggleUserSelection(user) {
+            const idx = this.selectedUsers.findIndex(u => u.Id === user.Id);
+            if (idx >= 0) {
+                this.selectedUsers.splice(idx, 1);
             } else {
-                self.deleteGroup(groupId, user);
+                this.selectedUsers.push({ Id: user.Id, Name: user.Name, InGroup: user.InGroup });
             }
-        };
+        },
 
-        this.updateExistingGroup = function (id, users) {
-
-            $.ajax({
-                url: self.baseUriGroups + "/?id=" + id,
-                type: 'PUT',
-                traditional: true,
-                data: JSON.stringify(ko.toJS(users)),
-                contentType: "application/json"
-            }).done(function (result) {
-                self.groups.removeAll();
-                self.groupName("");
-                self.removeAllSelectedUsers();
-                self.getGroupData();
-                self.getUserData();
-            }).fail(function (xhr, error, status) {
-                if (status === "Conflict") {
-                    alert(xhr.responseJSON.Message);
-                } else {
-                    alert("Status Code: " + status + "\nMessage: " + xhr.responseText);
+        async getUserData() {
+            try {
+                const response = await fetch(this.baseUriUsers);
+                if (response.ok) {
+                    this.users = await response.json();
                 }
-            });
-        };
+            } catch (e) {
+                alert('Error loading users');
+            }
+        },
 
-        this.saveGroup = function () {
-
-            var group = { Id: null, Name: self.groupName(), Users: ko.toJS(self.selectedUsers) };
-
-            $.ajax({
-                url: self.baseUriGroups,
-                type: 'POST',
-                traditional: true,
-                data: JSON.stringify(group),
-                contentType: "application/json"
-            }).done(function (result) {
-                self.groups.removeAll();
-                self.groupName("");
-                self.removeAllSelectedUsers();
-                self.getGroupData();
-                self.getUserData();
-            }).fail(function (xhr, error, status) {
-                if (status === "Conflict") {
-                    alert(xhr.responseJSON.Message);
-                } else {
-                    alert("Status Code: " + status + "\nMessage: " + xhr.responseText);
-                }
-            });
-        };
-
-        this.runAlghoritm = function () {
-
-            $.ajax({
-                url: self.baseUriUsers + "/Match",
-                type: 'GET',
-                traditional: true,
-                contentType: "application/json"
-            }).done(function (result) {
-
-                if (result.length == 0) {
-                    alert("Not possible matching!!!");
-                } else {
-                    self.matches.removeAll();
-                    self.matches(ko.utils.arrayMap(result, function (d) {
-                        return new MatchViewModel(d);
-                    }));
-                }
-            }).fail(function(xhr, error, status) {
-                if (status === "Conflict") {
-                    alert(xhr.responseJSON.Message);
-                } else {
-                    alert("Status Code: " + status + "\nMessage: " + xhr.responseText);
-                }
-            });
-        };
-
-        this.getGroupData = function () {
-            $.ajax({
-                url: self.baseUriGroups,
-                type: 'GET',
-                accepts: "application/json",
-                contentType: "application/json"
-            }).done(function (result) {
-                if (result === undefined || result === null) {
-                    return;
-                } else {
-                    self.usersInGroups.removeAll();
-                    self.groups.removeAll();
-                    if (result.length >= 0) {
-                        self.mapGroupData(result);
-                    }
-                }
-            }).fail(function (xhr, error, status) {
-                alert("Status Code: " + status + "\nMessage: " + xhr.responseText);
+        async addUser() {
+            if (!this.userToAdd) return;
+            try {
+                const response = await fetch(this.baseUriUsers, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(this.userToAdd)
                 });
-        };
+                if (response.ok) {
+                    this.userToAdd = '';
+                    await this.getUserData();
+                } else {
+                    const msg = await response.text();
+                    alert(msg);
+                }
+            } catch (e) {
+                alert('Error adding user');
+            }
+        },
 
-        this.getGroupData();
-        this.getUserData();
-    };
+        async deleteUser(user) {
+            this.selectedUsers = this.selectedUsers.filter(u => u.Id !== user.Id);
+            try {
+                await fetch(`${this.baseUriUsers}/?id=${user.Id}`, { method: 'DELETE' });
+                await this.getUserData();
+            } catch (e) {
+                alert('Error deleting user');
+            }
+        },
 
-    ko.applyBindings(new SecretSantaViewModel());
+        async getGroupData() {
+            try {
+                const response = await fetch(this.baseUriGroups);
+                if (response.ok) {
+                    this.groups = await response.json();
+                }
+            } catch (e) {
+                alert('Error loading groups');
+            }
+        },
+
+        async saveGroup() {
+            if (!this.groupName) return;
+            const group = { Id: null, Name: this.groupName, Users: this.selectedUsers };
+            try {
+                const response = await fetch(this.baseUriGroups, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(group)
+                });
+                if (response.ok) {
+                    this.groupName = '';
+                    this.selectedUsers = [];
+                    this.showGroupNameInput = false;
+                    await this.getGroupData();
+                    await this.getUserData();
+                } else {
+                    const msg = await response.text();
+                    alert(msg);
+                }
+            } catch (e) {
+                alert('Error saving group');
+            }
+        },
+
+        async updateGroup() {
+            if (!this.selectedGroupId) return;
+            try {
+                const response = await fetch(`${this.baseUriGroups}/?id=${this.selectedGroupId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(this.selectedUsers)
+                });
+                if (response.ok) {
+                    this.selectedUsers = [];
+                    this.selectedGroupId = '';
+                    await this.getGroupData();
+                    await this.getUserData();
+                } else {
+                    const msg = await response.text();
+                    alert(msg);
+                }
+            } catch (e) {
+                alert('Error updating group');
+            }
+        },
+
+        async removeFromGroup(groupId, user) {
+            const group = this.groups.find(g => g.Id === groupId);
+            if (group && group.Users.length <= 2) {
+                if (!confirm('Each group must have at least 2 people. Removing this person will delete the whole group. Continue?')) {
+                    return;
+                }
+            }
+            try {
+                await fetch(`${this.baseUriGroups}/?id=${groupId}`, {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(user)
+                });
+                await this.getGroupData();
+                await this.getUserData();
+            } catch (e) {
+                alert('Error removing from group');
+            }
+        },
+
+        async runMatch() {
+            try {
+                const response = await fetch(`${this.baseUriUsers}/Match`);
+                const data = await response.json();
+                if (!response.ok || !data.length) {
+                    alert('Not possible matching!!!');
+                } else {
+                    this.matches = data;
+                }
+            } catch (e) {
+                alert('Error running match');
+            }
+        }
+    }));
 });
